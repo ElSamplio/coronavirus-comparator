@@ -1,5 +1,9 @@
 Web App to get line graphs comparission between countries by chosen period about COVID-19 cases, deaths and recoveries
 
+![Alt text](/screenshots/screen_1?raw=true "First view")
+
+![Alt text](/screenshots/screen_2?raw=true "Comparissions in graph")
+
 ## Remarks
 
 Back end taken from [pomber/covid19](https://github.com/pomber/covid19)
