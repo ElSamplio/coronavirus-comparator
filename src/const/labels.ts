@@ -20,7 +20,12 @@ export const labels_es = {
     },
     confirmed: 'Casos confirmados',
     deaths: 'Muertes',
-    recovered: 'Recuperados'
+    recovered: 'Recuperados',
+    merge: 'Mezclar',
+    mergeTooltip: 'Mezclar en gráfico',
+    initialCriteria: 'Criterio inicial',
+    initialDate: 'Fecha de inicio',
+    initialCases: 'Número inicial de casos'
 }
 
 export const labels_en = {
@@ -45,5 +50,10 @@ export const labels_en = {
     },
     confirmed: 'Confirmed cases',
     deaths: 'Deaths',
-    recovered: 'Recovered'
+    recovered: 'Recovered',
+    merge: 'Merge',
+    mergeTooltip: 'Merge in graph',
+    initialCriteria: 'Initial criteria',
+    initialDate: 'Initial date',
+    initialCases: 'Initial number of cases'
 }

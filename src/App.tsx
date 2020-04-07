@@ -12,11 +12,12 @@ import { Dropdown } from 'primereact/dropdown';
 import { Spinner } from 'primereact/spinner';
 import { Calendar } from 'primereact/calendar';
 import { DataView } from 'primereact/dataview';
-import { Chart } from 'primereact/chart';
-import { Toolbar } from 'primereact/toolbar';
+import { RadioButton } from 'primereact/radiobutton';
 import { labels_es, labels_en } from './const/labels';
 import { languages } from './const/languages';
 import { traerDatos } from './controllers/data.controller';
+import GraphItem from './components/GraphItem';
+import MergedGraphs from './components/MergedGraphs';
 
 const moment = require('moment');
 
@@ -31,6 +32,10 @@ const App: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<number>(1);
   const [selectedDate, setSelectedDate] = useState<Date | Date[]>(new Date());
   const [dataSeries, setDataSeries] = useState<any[]>([]);
+  const [itemsToMerge, setItemsToMerge] = useState<any[]>([]);
+  const [intervalType, setIntervalType] = useState<number>(0);
+  const [numberOfCases, setNumberOfCases] = useState<number>(0);
+  const [comparatorVisible, setComparatorVisible] = useState<boolean>(false);
 
   useEffect(() => {
     setLoading(true);
@@ -82,19 +87,32 @@ const App: React.FC = () => {
     if (selectedData) {
       let endDate = new Date(selectedDate.toString());
       let results: any[] = [];
-      for (let i = 0; i < selectedDays; i++) {
-        let current = new Date();
-        current.setTime(endDate.getTime());
-        current.setDate(current.getDate() + i);
-        let currentStr = moment(current).format('YYYY-M-D')
-        const result = selectedData.filter((elem) => elem.date === currentStr);
-        if (result && result.length > 0) {
-          results.push(result[0]);
-        }
+      switch (intervalType) {
+        case 0:
+          for (let i = 0; i < selectedDays; i++) {
+            let current = new Date();
+            current.setTime(endDate.getTime());
+            current.setDate(current.getDate() + i);
+            let currentStr = moment(current).format('YYYY-M-D')
+            const result = selectedData.filter((elem) => elem.date === currentStr);
+            if (result && result.length > 0) {
+              results.push(result[0]);
+            }
+          }
+          break;
+        case 1:
+          let result: any[] = selectedData.filter((elem) => elem.confirmed >= numberOfCases);
+          result = result.slice(0, selectedDays);
+          results.push(...result);
+          break;
+        default:
+          break;
       }
       let objData = {
         country: selectedCountry,
+        intervalType,
         fromDate: selectedDate,
+        initialCasesNumber: numberOfCases,
         days: selectedDays,
         data: results,
       }
@@ -109,81 +127,23 @@ const App: React.FC = () => {
     setSelectedDays(1);
     setSelectedDate(new Date());
     setDataSeries([]);
+    setItemsToMerge([]);
+    setIntervalType(0);
+    setNumberOfCases(0);
+    setComparatorVisible(false);
   }
 
   const itemTemplate = (record: any) => {
-    return <div style={{ padding: '.5em' }} className="p-col-12 p-md-4 p-lg-4">
-      <div className='p-grid'>
-        <div className='p-col-12 p-md-12 p-lg-12'>
-          <Toolbar>
-            <div className="p-toolbar-group-left">
-              {record.country}
-            </div>
-            <div className="p-toolbar-group-right">
-              <Button icon="pi pi-times"
-                onClick={() => removeItem(record)} />
-            </div>
-          </Toolbar>
-        </div>
-        <div className='p-col-12 p-md-2 p-lg-3'>
-          {labels.dateFrom}
-        </div>
-        <div className='p-col-12 p-md-3 p-lg-3'>
-          {moment(record.fromDate).format('YYYY-M-D')}
-        </div>
-        <div className='p-col-12 p-md-2 p-lg-3'>
-          {labels.days}
-        </div>
-        <div className='p-col-12 p-md-3 p-lg-3'>
-          {record.days}
-        </div>
-        <div className='p-col-12 p-md-12 p-lg-12'>
-          {generateChart(record.data)}
-        </div>
-      </div>
-    </div >
+    return <GraphItem labels={labels}
+      record={record}
+      itemsToMerge={itemsToMerge}
+      checkItem={checkItem}
+      removeItem={removeItem}
+      showMergedGraphs={showMergedGraphs} />;
   }
 
-  const generateChart = (data: any) => {
-    let confirmedDataset: number[] = [];
-    let deathsDataset: number[] = [];
-    let recoveredDataset: number[] = [];
-    let chartLabels: string[] = [];
-    let dayNumber = 1;
-    for (let record of data) {
-      confirmedDataset.push(record.confirmed ? record.confirmed : 0);
-      deathsDataset.push(record.deaths ? record.deaths : 0);
-      recoveredDataset.push(record.recovered ? record.recovered : 0);
-      chartLabels.push(record.date);
-      dayNumber++;
-    }
-    const dataToShow = {
-      labels: chartLabels,
-      datasets: [
-        {
-          label: labels.confirmed,
-          data: confirmedDataset,
-          fill: false,
-          backgroundColor: '#42A5F5',
-          borderColor: '#42A5F5'
-        },
-        {
-          label: labels.deaths,
-          data: deathsDataset,
-          fill: false,
-          backgroundColor: '#66BB6A',
-          borderColor: '#66BB6A'
-        },
-        {
-          label: labels.recovered,
-          data: recoveredDataset,
-          fill: false,
-          backgroundColor: '#FFA726',
-          borderColor: '#FFA726'
-        }
-      ]
-    };
-    return <Chart type="line" data={dataToShow} />
+  const showMergedGraphs = () => {
+    setComparatorVisible(true);
   }
 
   const removeItem = (item: any) => {
@@ -191,8 +151,29 @@ const App: React.FC = () => {
     let foundIndex = seriesCopy.findIndex((elem) => elem === item);
     if (foundIndex >= 0) {
       seriesCopy.splice(foundIndex, 1);
+      if (itemsToMerge.includes(item)) {
+        let items = [...itemsToMerge];
+        let foundIndexMerge = items.findIndex((elem) => elem === item);
+        if (foundIndexMerge >= 0) {
+          items.splice(foundIndexMerge, 1);
+        }
+        setItemsToMerge(items);
+      }
       setDataSeries(seriesCopy);
     }
+  }
+
+  const checkItem = (checked: boolean, item: any) => {
+    let items = [...itemsToMerge];
+    if (checked) {
+      items.push(item);
+    } else {
+      let foundIndex = items.findIndex((elem) => elem === item);
+      if (foundIndex >= 0) {
+        items.splice(foundIndex, 1);
+      }
+    }
+    setItemsToMerge(items);
   }
 
   return (
@@ -202,6 +183,11 @@ const App: React.FC = () => {
         onHide={() => setLoading(false)}
         closable={false}>
         <ProgressSpinner />
+      </Dialog>
+      <Dialog modal={true} visible={comparatorVisible}
+        onHide={() => setComparatorVisible(false)}
+        closable={true} maximized={true} maximizable={true}>
+        <MergedGraphs graphsData={itemsToMerge} labels={labels} />
       </Dialog>
       <div className='p-col-12 p-md-3 p-lg-3 App-header'>
         <img src={logo} className='App-logo' alt='logo' />
@@ -230,27 +216,56 @@ const App: React.FC = () => {
       </div>
       <div className='p-col-12 p-md-3 p-lg-3'>
         <Spinner value={selectedDays}
-          onChange={(e) => setSelectedDays(e.value)} min={1} max={30} />
+          onChange={(e) => setSelectedDays(e.value)} min={1} max={150} />
       </div>
       <div className='p-col-12 p-md-1 p-lg-1'>
-        {labels.dateFrom}
+        {labels.initialCriteria}
       </div>
       <div className='p-col-12 p-md-3 p-lg-3'>
-        <Calendar locale={labels.calendar} dateFormat='dd/mm/yy'
-          value={selectedDate} onChange={(e) => setSelectedDate(e.value)}
-          minDate={new Date('2020-01-22')}
-          maxDate={new Date()}></Calendar>
+        <div className='p-col-12'>
+          <RadioButton inputId="rb1" name="type"
+            value={0} onChange={(e) => {
+              setIntervalType(e.value);
+              setNumberOfCases(0);
+            }}
+            checked={intervalType === 0} />
+          <label htmlFor="rb1" className="p-radiobutton-label">{labels.initialDate}</label>
+        </div>
+        <div className='p-col-12'>
+          <RadioButton inputId="rb2" name="type"
+            value={1} onChange={(e) => {
+              setIntervalType(e.value);
+              setSelectedDate(new Date());
+            }}
+            checked={intervalType === 1} />
+          <label htmlFor="rb2" className="p-radiobutton-label">{labels.initialCases}</label>
+        </div>
       </div>
-      <div className='p-col-12 p-md-3 p-lg-3' />
+      <div className='p-col-12 p-md-1 p-lg-1'>
+        {intervalType === 0 ? labels.dateFrom : labels.initialCases}
+      </div>
       <div className='p-col-12 p-md-3 p-lg-3'>
-        <Button label={labels.showData} style={{ width: '90%', marginLeft: '5%', marginRight: '5%' }}
+        {
+          intervalType === 0 ?
+            <Calendar locale={labels.calendar} dateFormat='dd/mm/yy'
+              style={{ width: '100%' }} inputStyle={{ width: '100%' }}
+              value={selectedDate} onChange={(e) => setSelectedDate(e.value)}
+              minDate={new Date('2020-01-22')}
+              maxDate={new Date()}></Calendar>
+            :
+            <Spinner value={numberOfCases}
+              onChange={(e) => setNumberOfCases(e.value)} min={1} />
+        }
+
+      </div>
+      <div className='p-col-12 p-md-4 p-lg-4'>
+        <Button label={labels.showData} style={{ width: '80%', marginLeft: '10%', marginRight: '10%' }}
           onClick={filterData} />
       </div>
-      <div className='p-col-12 p-md-3 p-lg-3'>
-        <Button label={labels.reset} style={{ width: '90%', marginLeft: '5%', marginRight: '5%' }}
+      <div className='p-col-12 p-md-4 p-lg-4'>
+        <Button label={labels.reset} style={{ width: '80%', marginLeft: '10%', marginRight: '10%' }}
           onClick={restart} />
       </div>
-      <div className='p-col-12 p-md-3 p-lg-3' />
       <div className='p-col-12 p-md-12 p-lg-12'>
         <DataView value={dataSeries} layout='grid' itemTemplate={itemTemplate} />
       </div>
